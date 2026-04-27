@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # AI & Cloud Integrations
     GEMINI_API_KEY: str = ""
     GCP_PROJECT_ID: str = ""
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:3000/audit?tab=drive"
     ALERT_EMAIL: str = ""
     WEBHOOK_URL: str = ""
 

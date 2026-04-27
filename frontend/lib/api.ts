@@ -172,13 +172,28 @@ export async function uploadCSV(file: File): Promise<UploadResponse> {
   return data;
 }
 
-export async function importCloudDataset(req: {
-  source: 'gcs' | 'bigquery';
-  bucket_name?: string;
-  file_name?: string;
-  query?: string;
-}): Promise<UploadResponse> {
-  const { data } = await api.post('/cloud/import', req);
+export async function getDriveAuthUrl(): Promise<{ url: string }> {
+  const { data } = await api.get('/drive/auth/url');
+  return data;
+}
+
+export async function getDriveCreds(code: string): Promise<any> {
+  const { data } = await api.get(`/drive/auth/callback?code=${code}`);
+  return data;
+}
+
+export async function listDriveFiles(creds: any): Promise<{ files: any[] }> {
+  const { data } = await api.post('/drive/files', creds);
+  return data;
+}
+
+export async function importDriveFile(fileId: string, creds: any): Promise<UploadResponse> {
+  const form = new FormData();
+  form.append('file_id', fileId);
+  form.append('creds_json', JSON.stringify(creds));
+  const { data } = await api.post('/drive/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return data;
 }
 

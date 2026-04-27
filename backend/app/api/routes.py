@@ -34,11 +34,11 @@ from app.services.explainability_service import compute_explanations
 from app.services.mitigation_service import run_mitigation
 from app.services.report_service import generate_json_report, generate_pdf_report
 from app.services.proxy_service import detect_proxy_features
+from app.services.google_drive_service import drive_service
 from app.services.gemini_service import generate_ai_insights, chat_with_report, generate_decision_summary
 from app.services.compliance_service import check_compliance
 from app.services.monitoring_service import track_monitoring_metrics, get_drift_data
 from app.services.certificate_service import generate_compliance_certificate
-from app.services.gcp_service import import_from_gcs, import_from_bigquery
 from pydantic import BaseModel
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -437,40 +437,54 @@ async def simulate_scenario(req: ScenarioRequest):
 
 # ── Google Cloud Integration ─────────────────────────────────────────────────
 
-class GCPImportRequest(BaseModel):
-    source: str  # "gcs" or "bigquery"
-    bucket_name: Optional[str] = None
-    file_name: Optional[str] = None
-    query: Optional[str] = None
+# ── Google Drive Integration ───────────────────────────────────────────────
 
-@router.post("/cloud/import", response_model=UploadResponse)
-async def gcp_import(req: GCPImportRequest):
+@router.get("/drive/auth/url")
+async def get_drive_auth_url():
+    url = drive_service.get_authorization_url()
+    if not url:
+        raise AppError("Google Drive integration not configured on server.", status_code=500)
+    return {"url": url}
+
+@router.get("/drive/auth/callback")
+async def drive_auth_callback(code: str):
     try:
-        if req.source == "gcs":
-            if not req.bucket_name or not req.file_name:
-                raise AppError("Bucket name and file name required for GCS.", status_code=400)
-            df = import_from_gcs(req.bucket_name, req.file_name)
-            name = f"gcs_{req.file_name}"
-        elif req.source == "bigquery":
-            if not req.query:
-                raise AppError("Query required for BigQuery.", status_code=400)
-            df = import_from_bigquery(req.query)
-            name = "bigquery_result"
-        else:
-            raise AppError("Invalid source.", status_code=400)
-            
+        creds = drive_service.get_credentials(code)
+        return creds
+    except Exception as e:
+        logger.error(f"Drive auth callback failed: {e}")
+        raise AppError("Failed to authenticate with Google Drive.", status_code=400)
+
+@router.post("/drive/files")
+async def list_drive_files(creds: dict):
+    try:
+        files = drive_service.list_files(creds)
+        return {"files": files}
+    except Exception as e:
+        logger.error(f"Failed to list Drive files: {e}")
+        raise AppError("Unable to access Google Drive. Please re-authenticate.", status_code=401)
+
+@router.post("/drive/import", response_model=UploadResponse)
+async def drive_import(file_id: str = Form(...), creds_json: str = Form(...)):
+    import json
+    try:
+        creds = json.loads(creds_json)
+        df = drive_service.download_file(file_id, creds)
+        
+        # Convert DF to CSV stream for processing
         import io
         stream = io.StringIO()
         df.to_csv(stream, index=False)
         content = stream.getvalue().encode('utf-8')
         
-        result = await process_upload(content, name)
+        # Use existing processing logic
+        result = await process_upload(content, f"drive_file_{file_id}")
         return result
     except ValueError as e:
         raise AppError(str(e), status_code=400)
     except Exception as e:
-        logger.error(f"GCP import failed: {e}", exc_info=True)
-        raise AppError("Failed to import from Google Cloud.", status_code=500)
+        logger.error(f"Drive import failed: {e}", exc_info=True)
+        raise AppError("Failed to import from Google Drive.", status_code=500)
 
 
 # ── Compliance Certificate ───────────────────────────────────────────────────

@@ -73,56 +73,56 @@ const workflowSteps = [
     badge: 'Phase 01',
     title: 'Data Integration',
     desc: 'Seamlessly upload your CSV or connect to established benchmark datasets. Built for large-scale tabular data.',
-    image: '/1.jpg',
+    image: '/1.png',
     icon: Database
   },
   {
     badge: 'Phase 02',
     title: 'Attribute Mapping',
     desc: 'Intelligently identify and map target variables, features, and sensitive attributes to prepare for deep fairness analysis.',
-    image: '/2.jpg',
+    image: '/2.png',
     icon: GitCommit
   },
   {
     badge: 'Phase 03',
     title: 'Bias Evaluation',
     desc: 'Quantify disparities across protected groups using industry-standard metrics like Demographic Parity and Equalized Odds.',
-    image: '/3.1.jpg',
+    image: '/3.png',
     icon: AlertTriangle
   },
   {
     badge: 'Phase 04',
     title: 'Scenario Simulation',
     desc: 'Explore the fairness-accuracy tradeoff dynamically by adjusting decision thresholds and observing real-time metric updates.',
-    image: '/3.3.jpg',
+    image: '/4.png',
     icon: Settings
   },
   {
     badge: 'Phase 05',
     title: 'SHAP Explainability',
     desc: 'Uncover the "why" behind model predictions. Identify exactly which features are driving biased outcomes using Shapley values.',
-    image: '/4.jpg',
+    image: '/5.png',
     icon: Brain
   },
   {
     badge: 'Phase 06',
     title: 'Algorithmic Mitigation',
     desc: 'Apply advanced pre-processing and in-processing techniques from Fairlearn to mathematically reduce bias while preserving accuracy.',
-    image: '/5.jpg',
+    image: '/6.png',
     icon: Wrench
   },
   {
     badge: 'Phase 07',
     title: 'AI Consultant',
     desc: 'Interact with our context-aware assistant to interpret audit findings, explore mitigation strategies, and get actionable recommendations.',
-    image: '/0.1.jpg',
+    image: '/7.png',
     icon: Sparkles
   },
   {
     badge: 'Phase 08',
     title: 'Compliance Reporting',
     desc: 'Generate comprehensive executive summaries and detailed technical reports, fully exportable as PDFs for stakeholders.',
-    image: '/6.1.jpg',
+    image: '/8.png',
     icon: FileText
   }
 ];
@@ -262,7 +262,7 @@ export default function LandingPage() {
                   </div>
                   {/* The Image */}
                   <Image 
-                    src="/1.jpg" 
+                    src="/01.png" 
                     alt="FairnessAudit Dashboard" 
                     width={1400} 
                     height={800} 

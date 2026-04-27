@@ -34,6 +34,9 @@ def generate_json_report(
             "policy_compliance": analysis.get("policy_compliance", {}),
             "recommendations": analysis.get("recommendations", []),
             "impact_simulation": analysis.get("impact_simulation", {}),
+            "decision_summary": analysis.get("decision_summary"),
+            "timestamp": analysis.get("timestamp"),
+            "version": analysis.get("version", "v1.0"),
         }
 
     if explain:

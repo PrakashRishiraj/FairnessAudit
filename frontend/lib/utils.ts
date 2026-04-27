@@ -61,6 +61,26 @@ export function truncate(str: string, max = 30): string {
   return str.length > max ? str.slice(0, max) + '…' : str;
 }
 
+export function getMetricExplanation(metric: string, value: number, sensitiveCol: string): string {
+  const absVal = Math.abs(value);
+  const pct = (absVal * 100).toFixed(1);
+  
+  switch (metric) {
+    case 'Demographic Parity Difference':
+      return `Group A is ${pct}% more likely to receive a positive outcome than Group B.`;
+    case 'Equalized Odds Difference':
+      return `The model's error rates (false positives or false negatives) differ by ${pct}% between groups.`;
+    case 'Equal Opportunity Difference':
+      return `The model is ${pct}% more accurate at identifying qualified individuals in one group versus another.`;
+    case 'Demographic Parity Ratio':
+      return value >= 0.8 
+        ? `The selection rate ratio is ${value.toFixed(2)}, satisfying the 80% legal threshold for fairness.`
+        : `The selection rate ratio is ${value.toFixed(2)}, failing the 80% legal threshold for fairness.`;
+    default:
+      return '';
+  }
+}
+
 export const CHART_COLORS = [
   '#8B0000', // Maroon
   '#EF4444', // Red

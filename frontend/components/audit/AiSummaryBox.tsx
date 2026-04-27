@@ -29,27 +29,27 @@ export function AiSummaryBox({ stepName, contextData }: AiSummaryBoxProps) {
         const score = contextData?.overall_fairness_score || 0;
         const severity = contextData?.overall_bias_severity || 'Unknown';
         return {
-          title: "Bias Analysis Summary",
+          title: "Decision Panel Analysis",
           icon: <ShieldCheck className="text-accent-success" size={20}  strokeWidth={1.5}/>,
-          summary: `Your dataset has a fairness score of ${score}/100 with ${severity} bias detected.`,
+          summary: `Current score: ${score}/100. Potential ${severity} bias detected. Review the Decision Summary below for immediate action items.`,
           details: [
-            "Fairness Score: Higher is better. 100 means no statistical bias was found between groups.",
-            "Policy Compliance: We checked your data against legal standards like the '80% Rule'.",
-            "What's next: Move to Explainability to find out WHY this bias exists."
+            "Fairness Score: Measures statistical equality. Scores below 75 require mitigation.",
+            "Policy Compliance: Mapped to EU AI Act and NIST standards.",
+            "Next Action: Run SHAP Explainability to identify bias drivers."
           ]
         };
       case 'explain':
         const topProxies = contextData?.proxy_features || [];
         return {
-          title: "SHAP Explainability Insights",
+          title: "Explainability Audit",
           icon: <Brain className="text-red" size={20}  strokeWidth={1.5}/>,
-          summary: "We used SHAP values to look 'under the hood' of your model to see what's actually driving predictions.",
+          summary: "We are identifying the specific data features causing disparities. Look for 'Proxy Warnings' which indicate hidden bias sources.",
           details: [
-            "Feature Importance: Shows which data points had the biggest impact on the outcome.",
+            "Feature Impact: Identifies which inputs drive outcomes.",
             topProxies.length > 0 
-              ? `Proxy Warning: Detected ${topProxies.join(', ')} as potential proxies for sensitive attributes.` 
-              : "Proxy Check: No hidden proxies detected. This is good!",
-            "Impact: Understanding these drivers helps identify if bias is coming from specific historical patterns."
+              ? `Action: Review proxies: ${topProxies.slice(0, 2).join(', ')}.` 
+              : "Status: No proxy features detected.",
+            "Next Action: Proceed to Mitigation to fix these biases."
           ]
         };
       case 'mitigation':
@@ -57,11 +57,11 @@ export function AiSummaryBox({ stepName, contextData }: AiSummaryBoxProps) {
         return {
           title: "Mitigation Strategy",
           icon: <Wrench className="text-accent-warning" size={20}  strokeWidth={1.5}/>,
-          summary: "We applied state-of-the-art algorithms to 'unlearn' the biased patterns found in your data.",
+          summary: "Algorithms have been applied to equalize selection rates across groups. Compare 'Before' vs 'After' to see improvement.",
           details: [
-            `Fairness Gain: Your fairness score improved by ${(improvement * 100).toFixed(1)}%.`,
-            "Trade-offs: Sometimes fixing fairness slightly reduces raw accuracy. We aim for the best balance.",
-            "Best Method: The recommended algorithm is displayed below based on the fairness/accuracy trade-off."
+            `Result: Fairness improved by ${(improvement * 100).toFixed(1)}%.`,
+            "Trade-off: Monitor accuracy impact (delta) in the comparison table.",
+            "Next Action: Export the final Audit Report for compliance."
           ]
         };
       default:

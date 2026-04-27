@@ -81,6 +81,13 @@ export interface FairnessMetrics {
   warnings: string[];
 }
 
+export interface DecisionSummary {
+  problem: string;
+  cause: string;
+  recommendation: string;
+  expected_impact: string;
+}
+
 export interface AnalysisResponse {
   session_id: string;
   dataset_summary: Record<string, unknown>;
@@ -94,7 +101,10 @@ export interface AnalysisResponse {
     estimated_affected_users: number;
     impact_description: string;
   };
+  decision_summary?: DecisionSummary;
   warnings: string[];
+  timestamp?: string;
+  version?: string;
 }
 
 export interface FeatureImportance {

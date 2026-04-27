@@ -135,8 +135,9 @@ def _build_explanation(sensitive_col: str, dpd: Optional[float], dpr: Optional[f
         )
     if eod is not None:
         lines.append(
-            f"Equal opportunity difference is {eod:.3f}, indicating the true positive rate "
-            f"varies significantly between groups in '{sensitive_col}'."
+            f"Equitable Opportunity: The true positive rate varies by {abs(eod)*100:.1f}% "
+            f"across groups in '{sensitive_col}'. This indicates disparities in how correctly "
+            f"positive outcomes are assigned."
         )
     if severity == BiasSeverity.HIGH:
         lines.append(
@@ -281,7 +282,7 @@ def compute_fairness_metrics(
                 bias_severity=BiasSeverity.LOW,
                 fairness_score=100.0,
                 warnings=col_warnings,
-                explanation=f"Column '{sens_col}' has only one group; cannot assess fairness.",
+                explanation=f"Column '{sens_col}' contains only one group ('{grp_vals[0] if len(grp_vals)>0 else 'N/A'}'). Fairness audits require at least two groups to compare. This model assumes uniform treatment for this attribute.",
             ))
             continue
 

@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 import io
+from datetime import datetime
 
 from app.core.config import settings
 from app.core.errors import AppError
@@ -33,7 +34,7 @@ from app.services.explainability_service import compute_explanations
 from app.services.mitigation_service import run_mitigation
 from app.services.report_service import generate_json_report, generate_pdf_report
 from app.services.proxy_service import detect_proxy_features
-from app.services.gemini_service import generate_ai_insights, chat_with_report
+from app.services.gemini_service import generate_ai_insights, chat_with_report, generate_decision_summary
 from app.services.compliance_service import check_compliance
 from app.services.monitoring_service import track_monitoring_metrics, get_drift_data
 from app.services.certificate_service import generate_compliance_certificate
@@ -164,6 +165,14 @@ async def analyze(req: AnalysisRequest):
     for m in metrics:
         warnings.extend(m.warnings)
 
+    # Decision Summary
+    summary_data = {
+        "metrics": [m.dict() for m in metrics],
+        "overall_fairness_score": overall_score,
+        "overall_bias_severity": overall_severity,
+    }
+    decision_summary = await generate_decision_summary(summary_data)
+
     return AnalysisResponse(
         session_id=session_id,
         dataset_summary=dataset_summary,
@@ -174,7 +183,9 @@ async def analyze(req: AnalysisRequest):
         policy_compliance=policy,
         recommendations=recs,
         impact_simulation=impact,
+        decision_summary=decision_summary,
         warnings=list(set(warnings)),
+        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
 
 

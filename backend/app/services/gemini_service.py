@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 # Configure Gemini
 if settings.GEMINI_API_KEY:
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     logger.warning("GEMINI_API_KEY not found. AI insights will use rule-based fallback.")
     model = None
@@ -82,6 +82,67 @@ STEP_SUGGESTIONS = {
 }
 
 
+async def generate_decision_summary(analysis_data: dict):
+    """
+    Generates a structured decision summary for the Fairness Audit.
+    """
+    if not model:
+        return _get_fallback_decision_summary(analysis_data)
+
+    prompt = f"""
+    You are an expert AI Fairness Auditor. Based on the following fairness metrics, provide a high-level Decision Summary.
+    Be extremely concise (1 sentence per field). Avoid jargon.
+    
+    Fields:
+    1. Problem: What is the main fairness issue? (e.g., "Significant gender bias detected in loan approvals")
+    2. Cause: What is the technical root cause? (e.g., "Model over-relies on 'income' which differs by group")
+    3. Recommendation: What should the user do? (e.g., "Apply reweighing mitigation or remove proxy features")
+    4. Expected Impact: What is the result of action? (e.g., "Bias reduced by 40% with <1% accuracy loss")
+
+    Return ONLY structured JSON:
+    {{
+        "problem": "...",
+        "cause": "...",
+        "recommendation": "...",
+        "expected_impact": "..."
+    }}
+
+    Fairness Data:
+    {json.dumps(analysis_data, indent=2)}
+    """
+
+    try:
+        response = await model.generate_content_async(prompt)
+        text = response.text.strip()
+        if text.startswith("```json"):
+            text = text.replace("```json", "", 1).rsplit("```", 1)[0].strip()
+        elif text.startswith("```"):
+            text = text.replace("```", "", 1).rsplit("```", 1)[0].strip()
+        
+        return json.loads(text)
+    except Exception as e:
+        logger.error(f"Gemini Decision Summary failed: {e}")
+        return _get_fallback_decision_summary(analysis_data)
+
+
+def _get_fallback_decision_summary(data: dict):
+    """Rule-based fallback for decision summary."""
+    severity = data.get("overall_bias_severity", "Low")
+    if severity == "High":
+        return {
+            "problem": "Significant bias detected across sensitive groups.",
+            "cause": "Model outcomes show major disparity in selection rates.",
+            "recommendation": "Immediate mitigation (Reweighing) is required before deployment.",
+            "expected_impact": "Mitigation can reduce bias while maintaining functional accuracy."
+        }
+    return {
+        "problem": "No significant bias detected.",
+        "cause": "Model outcomes are relatively balanced across groups.",
+        "recommendation": "Continue monitoring model performance in production.",
+        "expected_impact": "Model remains compliant with standard fairness policies."
+    }
+
+
 async def generate_ai_insights(analysis_data: dict):
     """
     Sends fairness analysis JSON to Gemini and returns:
@@ -93,16 +154,14 @@ async def generate_ai_insights(analysis_data: dict):
         return get_fallback_insights(analysis_data)
 
     prompt = f"""
-    You are an expert AI Fairness Consultant. Analyze the following fairness audit report and provide:
-    1. A plain-English explanation of the detected biases.
-    2. Business-level insights on the impact of these biases.
-    3. Actionable suggested fixes to mitigate the bias.
-
+    You are an expert AI Fairness Consultant. Analyze the fairness audit data and provide short, clear insights.
+    Focus on DECISIONS and ACTIONS.
+    
     Return the response in a structured JSON format:
     {{
-        "explanation": "...",
-        "business_insights": "...",
-        "suggested_fixes": ["...", "..."]
+        "explanation": "Short summary of findings.",
+        "business_insights": "Business impact (risk/trust).",
+        "suggested_fixes": ["Fix 1", "Fix 2"]
     }}
 
     Fairness Audit Data:
@@ -110,7 +169,7 @@ async def generate_ai_insights(analysis_data: dict):
     """
 
     try:
-        response = model.generate_content(prompt)
+        response = await model.generate_content_async(prompt)
         # Clean response text in case it includes markdown code blocks
         text = response.text.strip()
         if text.startswith("```json"):

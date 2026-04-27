@@ -81,6 +81,13 @@ export interface FairnessMetrics {
   warnings: string[];
 }
 
+export interface DecisionSummary {
+  problem: string;
+  cause: string;
+  recommendation: string;
+  expected_impact: string;
+}
+
 export interface AnalysisResponse {
   session_id: string;
   dataset_summary: Record<string, unknown>;
@@ -94,7 +101,10 @@ export interface AnalysisResponse {
     estimated_affected_users: number;
     impact_description: string;
   };
+  decision_summary?: DecisionSummary;
   warnings: string[];
+  timestamp?: string;
+  version?: string;
 }
 
 export interface FeatureImportance {
@@ -162,13 +172,28 @@ export async function uploadCSV(file: File): Promise<UploadResponse> {
   return data;
 }
 
-export async function importCloudDataset(req: {
-  source: 'gcs' | 'bigquery';
-  bucket_name?: string;
-  file_name?: string;
-  query?: string;
-}): Promise<UploadResponse> {
-  const { data } = await api.post('/cloud/import', req);
+export async function getDriveAuthUrl(): Promise<{ url: string }> {
+  const { data } = await api.get('/drive/auth/url');
+  return data;
+}
+
+export async function getDriveCreds(code: string): Promise<any> {
+  const { data } = await api.get(`/drive/auth/callback?code=${code}`);
+  return data;
+}
+
+export async function listDriveFiles(creds: any): Promise<{ files: any[] }> {
+  const { data } = await api.post('/drive/files', creds);
+  return data;
+}
+
+export async function importDriveFile(fileId: string, creds: any): Promise<UploadResponse> {
+  const form = new FormData();
+  form.append('file_id', fileId);
+  form.append('creds_json', JSON.stringify(creds));
+  const { data } = await api.post('/drive/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return data;
 }
 

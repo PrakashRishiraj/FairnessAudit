@@ -2,8 +2,9 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { FilePlus, Database, Sparkles, FileText, AlertCircle, ShieldCheck, X, Cloud } from 'lucide-react';
-import { SampleDataset, UploadResponse, uploadCSV, importCloudDataset } from '@/lib/api';
+import { FilePlus, Database, Sparkles, FileText, AlertCircle, ShieldCheck, X, Cloud, Loader2 } from 'lucide-react';
+import { SampleDataset, UploadResponse, uploadCSV, getDriveAuthUrl, getDriveCreds, listDriveFiles, importDriveFile } from '@/lib/api';
+import { useEffect } from 'react';
 
 interface DatasetStepProps {
   sampleDatasets: SampleDataset[];
@@ -18,11 +19,87 @@ export function DatasetStep({ sampleDatasets, onSampleSelect, onUpload, isDemo }
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [showCloudModal, setShowCloudModal] = useState(false);
-  const [cloudSource, setCloudSource] = useState<'gcs' | 'bigquery'>('gcs');
-  const [bucketName, setBucketName] = useState('');
-  const [fileName, setFileName] = useState('');
-  const [bqQuery, setBqQuery] = useState('');
+  const [showDriveModal, setShowDriveModal] = useState(false);
+  const [driveFiles, setDriveFiles] = useState<any[]>([]);
+  const [fetchingFiles, setFetchingFiles] = useState(false);
+  const [driveCreds, setDriveCredsState] = useState<any>(null);
+
+  // Handle OAuth Callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      handleDriveCallback(code);
+    }
+    
+    // Check session storage for existing creds
+    const stored = sessionStorage.getItem('drive_creds');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setDriveCredsState(parsed);
+      } catch (e) {}
+    }
+  }, []);
+
+  const handleDriveCallback = async (code: string) => {
+    setUploading(true);
+    try {
+      const creds = await getDriveCreds(code);
+      setDriveCredsState(creds);
+      sessionStorage.setItem('drive_creds', JSON.stringify(creds));
+      setShowDriveModal(true);
+      fetchFiles(creds);
+    } catch (e: any) {
+      setError(e.message || 'Drive auth failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const fetchFiles = async (creds: any) => {
+    setFetchingFiles(true);
+    try {
+      const { files } = await listDriveFiles(creds);
+      setDriveFiles(files);
+    } catch (e: any) {
+      setError(e.message || 'Failed to list Drive files');
+    } finally {
+      setFetchingFiles(false);
+    }
+  };
+
+  const handleDriveButtonClick = async () => {
+    if (driveCreds) {
+      setShowDriveModal(true);
+      fetchFiles(driveCreds);
+    } else {
+      setUploading(true);
+      try {
+        const { url } = await getDriveAuthUrl();
+        window.location.href = url;
+      } catch (e: any) {
+        setError(e.message || 'Failed to get auth URL');
+        setUploading(false);
+      }
+    }
+  };
+
+  const handleDriveFileSelect = async (fileId: string) => {
+    setUploading(true);
+    setShowDriveModal(false);
+    setError(null);
+    try {
+      const res = await importDriveFile(fileId, driveCreds);
+      onUpload(res);
+    } catch (e: any) {
+      setError(e.message || 'Drive import failed');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.name.endsWith('.csv')) {
@@ -48,24 +125,6 @@ export function DatasetStep({ sampleDatasets, onSampleSelect, onUpload, isDemo }
     if (file) handleFile(file);
   }, [handleFile]);
 
-  const handleCloudImport = async () => {
-    setUploading(true);
-    setError(null);
-    setShowCloudModal(false);
-    try {
-      const res = await importCloudDataset({
-        source: cloudSource,
-        bucket_name: bucketName,
-        file_name: fileName,
-        query: bqQuery
-      });
-      onUpload(res);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Cloud import failed. Ensure GCP is configured.');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const biasColors: Record<string, string> = {
     'Gender bias': '#EF4444', // Red
@@ -134,8 +193,8 @@ export function DatasetStep({ sampleDatasets, onSampleSelect, onUpload, isDemo }
             </div>
           </div>
           
-          <button onClick={() => setShowCloudModal(true)} disabled={uploading} className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-background-elevated hover:bg-white/5 border border-border-default text-text-primary rounded-xl transition-colors text-sm font-medium disabled:opacity-50">
-            <Cloud size={16} className="text-red"  strokeWidth={1.5}/> Import from Cloud Data
+          <button onClick={handleDriveButtonClick} disabled={uploading} className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-background-elevated hover:bg-white/5 border border-border-default text-text-primary rounded-xl transition-colors text-sm font-medium disabled:opacity-50">
+            <Cloud size={16} className="text-red"  strokeWidth={1.5}/> Import from Google Drive
           </button>
 
           {error && (
@@ -242,40 +301,59 @@ export function DatasetStep({ sampleDatasets, onSampleSelect, onUpload, isDemo }
         </button>
       </div>
 
-      {showCloudModal && (
+      {showDriveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
             <div className="p-4 border-b border-border-default flex justify-between items-center bg-background-primary">
-              <h3 className="font-bold text-text-primary flex items-center gap-2"><Cloud className="text-red" strokeWidth={1.5}/> Import Cloud Data</h3>
-              <button onClick={() => setShowCloudModal(false)} className="text-text-muted hover:text-text-primary"><X size={20} strokeWidth={1.5}/></button>
+              <h3 className="font-bold text-text-primary flex items-center gap-2"><Cloud className="text-red" strokeWidth={1.5}/> Select Google Drive Dataset</h3>
+              <button onClick={() => setShowDriveModal(false)} className="text-text-muted hover:text-text-primary"><X size={20} strokeWidth={1.5}/></button>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="flex gap-2">
-                 <button onClick={() => setCloudSource('gcs')} className={`flex-1 py-2 text-sm font-medium rounded-lg ${cloudSource === 'gcs' ? 'bg-maroon text-white' : 'bg-background-elevated text-text-secondary border border-border-default'}`}>Cloud Storage</button>
-                 <button onClick={() => setCloudSource('bigquery')} className={`flex-1 py-2 text-sm font-medium rounded-lg ${cloudSource === 'bigquery' ? 'bg-maroon text-white' : 'bg-background-elevated text-text-secondary border border-border-default'}`}>BigQuery</button>
-              </div>
-              
-              {cloudSource === 'gcs' ? (
-                <div className="space-y-4">
-                   <div>
-                     <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Bucket Name</label>
-                     <input type="text" value={bucketName} onChange={e => setBucketName(e.target.value)} className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]" placeholder="my-gcs-bucket" />
-                   </div>
-                   <div>
-                     <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">File Name (CSV)</label>
-                     <input type="text" value={fileName} onChange={e => setFileName(e.target.value)} className="w-full bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]" placeholder="data/dataset.csv" />
-                   </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+              {fetchingFiles ? (
+                <div className="py-20 flex flex-col items-center gap-4">
+                  <Loader2 className="animate-spin text-red" size={32} />
+                  <p className="text-sm text-text-secondary">Fetching your files...</p>
+                </div>
+              ) : driveFiles.length > 0 ? (
+                <div className="space-y-2">
+                  {driveFiles.map((file) => (
+                    <div 
+                      key={file.id}
+                      onClick={() => handleDriveFileSelect(file.id)}
+                      className="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/5 cursor-pointer group transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-maroon/10 flex items-center justify-center">
+                          <FileText size={16} className="text-red" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-text-primary group-hover:text-red transition-colors">{file.name}</p>
+                          <p className="text-[10px] text-text-muted">{file.mimeType.includes('spreadsheet') ? 'Google Sheet' : 'CSV File'}</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-text-muted">
+                        Modified: {new Date(file.modifiedTime).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">SQL Query</label>
-                  <textarea value={bqQuery} onChange={e => setBqQuery(e.target.value)} className="w-full h-32 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)] font-mono text-xs leading-relaxed" placeholder="SELECT * FROM `my_project.my_dataset.my_table` LIMIT 1000" />
+                <div className="py-20 text-center space-y-3">
+                  <p className="text-text-secondary">No valid CSV or Sheets found in your Drive.</p>
+                  <p className="text-xs text-text-muted">Try uploading a CSV to your Drive first.</p>
                 </div>
               )}
             </div>
-            <div className="p-4 border-t border-border-default bg-background-primary flex justify-end gap-3">
-              <button onClick={() => setShowCloudModal(false)} className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary">Cancel</button>
-              <button onClick={handleCloudImport} disabled={uploading || (cloudSource === 'gcs' ? (!bucketName || !fileName) : !bqQuery)} className="px-5 py-2 text-sm font-medium bg-maroon text-white rounded-lg disabled:opacity-50 hover:bg-maroon-light transition-colors">Import Data</button>
+            
+            <div className="p-4 border-t border-border-default bg-background-primary flex justify-between items-center">
+              <p className="text-[10px] text-text-muted">Only showing .csv and Google Sheets</p>
+              <button 
+                onClick={() => { setDriveCredsState(null); sessionStorage.removeItem('drive_creds'); handleDriveButtonClick(); }}
+                className="text-[11px] font-medium text-red hover:underline"
+              >
+                Switch Account
+              </button>
             </div>
           </div>
         </div>

@@ -13,8 +13,10 @@ import { AnalysisResponse, FairnessMetrics, GroupMetric } from '@/lib/api';
 import { formatNumber, formatPercent, getBiasColor, getScoreColor, getScoreLabel, CHART_COLORS } from '@/lib/utils';
 import { AiSummaryBox } from './AiSummaryBox';
 import { ScenarioSimulator } from './ScenarioSimulator';
+import { DecisionPanel } from './DecisionPanel';
 import { MetricSkeleton, Skeleton } from '../ui/Skeleton';
 import { FairnessScoreIcon, BiasMetricsIcon } from '../ui/Icons';
+import { getMetricExplanation } from '@/lib/utils';
 
 interface AnalysisStepProps {
   response?: AnalysisResponse;
@@ -65,25 +67,34 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
-function MetricRow({ label, value, info }: { label: string; value?: number | null; info: string }) {
+function MetricRow({ label, value, info, sensitiveCol }: { label: string; value?: number | null; info: string; sensitiveCol: string }) {
   if (value === null || value === undefined) return null;
   const abs = Math.abs(value);
   const color = abs > 0.2 ? 'var(--accent-danger)' : abs > 0.1 ? 'var(--accent-warning)' : 'var(--accent-success)';
+  const explanation = getMetricExplanation(label, value, sensitiveCol);
+
   return (
-    <div className="flex items-center justify-between py-2 border-b border-border-default">
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-text-secondary">{label}</span>
-        <div className="tooltip">
-          <Info size={12} className="text-text-muted cursor-help"  strokeWidth={1.5}/>
-          <div className="tooltip-text">{info}</div>
+    <div className="flex flex-col py-3 border-b border-border-default group">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-text-secondary">{label}</span>
+          <div className="tooltip">
+            <Info size={12} className="text-text-muted cursor-help" strokeWidth={1.5}/>
+            <div className="tooltip-text">{info}</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="w-24 h-1.5 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(abs * 300, 100)}%`, background: color }} />
+          </div>
+          <span className="font-mono text-sm font-bold w-16 text-right" style={{ color }}>{formatNumber(value, 4)}</span>
         </div>
       </div>
-      <div className="flex items-center gap-3">
-        <div className="w-24 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-          <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(abs * 300, 100)}%`, background: color }} />
-        </div>
-        <span className="font-mono text-sm font-medium w-16 text-right" style={{ color }}>{formatNumber(value, 4)}</span>
-      </div>
+      {explanation && (
+        <p className="text-[11px] text-text-muted italic leading-snug group-hover:text-text-secondary transition-colors">
+          {explanation}
+        </p>
+      )}
     </div>
   );
 }
@@ -234,6 +245,17 @@ export function AnalysisStep({ response, loading, onRunAnalysis, onContinue, onR
 
   return (
     <div className="space-y-6 fade-in">
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-4 text-[11px] font-medium text-text-muted">
+          <span className="flex items-center gap-1"><ShieldCheck size={12} /> Audit Version: {response.version || 'v1.0'}</span>
+          <span className="flex items-center gap-1"><RefreshCw size={12} /> Generated: {response.timestamp || 'Just now'}</span>
+          <span className="hidden md:inline">·</span>
+          <span className="hidden md:inline text-maroon-light">Assumptions: Binary classification, Standard threshold (0.5)</span>
+        </div>
+      </div>
+
+      <DecisionPanel summary={response.decision_summary} />
+      
       <AiSummaryBox stepName="analysis" contextData={response} />
 
       {/* Overview row */}
@@ -258,15 +280,15 @@ export function AnalysisStep({ response, loading, onRunAnalysis, onContinue, onR
             {response.bias_explanation}
           </p>
 
-          {response.warnings.filter(w => !w.startsWith("Proxy Alert:")).length > 0 && (
-            <div className="p-3 rounded-lg text-xs mb-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-start gap-2">
+          {response.warnings.filter(w => !w.startsWith("Proxy Alert:")).map((w, idx) => (
+            <div key={`warn-${idx}`} className="p-3 rounded-lg text-xs mb-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-start gap-2">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" strokeWidth={1.5}/>
-              <span>{response.warnings.filter(w => !w.startsWith("Proxy Alert:"))[0]}</span>
+              <span>{w}</span>
             </div>
-          )}
+          ))}
           
           {response.warnings.filter(w => w.startsWith("Proxy Alert:")).map((w, idx) => (
-            <div key={idx} className="p-3 rounded-lg text-xs mt-2 bg-red/10 border border-red/20 text-red flex items-start gap-2">
+            <div key={`proxy-${idx}`} className="p-3 rounded-lg text-xs mt-2 bg-red/10 border border-red/20 text-red flex items-start gap-2">
               <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" strokeWidth={1.5}/>
               <span>{w}</span>
             </div>
@@ -313,13 +335,13 @@ export function AnalysisStep({ response, loading, onRunAnalysis, onContinue, onR
                 <h4 className="text-xs font-medium uppercase tracking-wider mb-3 text-text-muted">
                   Fairness Metrics
                 </h4>
-                <MetricRow label="Demographic Parity Difference" value={m.demographic_parity_difference}
+                <MetricRow label="Demographic Parity Difference" value={m.demographic_parity_difference} sensitiveCol={m.sensitive_column}
                   info="Difference in positive prediction rates between groups. 0 = perfectly fair." />
-                <MetricRow label="Demographic Parity Ratio" value={m.demographic_parity_ratio}
+                <MetricRow label="Demographic Parity Ratio" value={m.demographic_parity_ratio} sensitiveCol={m.sensitive_column}
                   info="Ratio of min to max selection rate. 1.0 = perfectly fair (80% rule: ≥0.8)." />
-                <MetricRow label="Equalized Odds Difference" value={m.equalized_odds_difference}
+                <MetricRow label="Equalized Odds Difference" value={m.equalized_odds_difference} sensitiveCol={m.sensitive_column}
                   info="Max difference in TPR or FPR between groups. 0 = perfectly fair." />
-                <MetricRow label="Equal Opportunity Difference" value={m.equal_opportunity_difference}
+                <MetricRow label="Equal Opportunity Difference" value={m.equal_opportunity_difference} sensitiveCol={m.sensitive_column}
                   info="Difference in true positive rates between groups. 0 = perfectly fair." />
               </div>
               <div>

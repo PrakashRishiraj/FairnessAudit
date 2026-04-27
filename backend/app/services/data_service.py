@@ -122,10 +122,18 @@ async def process_upload(file_bytes: bytes, filename: str) -> UploadResponse:
         df[col] = df[col].astype(str).str.strip()
         df[col] = df[col].replace({"nan": np.nan, "None": np.nan, "": np.nan})
 
-    if len(df) < 10:
-        warnings.append("Dataset has fewer than 10 rows. Results may be unreliable.")
+    if len(df) < 50:
+        warnings.append("⚠️ Small Dataset Warning: Dataset has fewer than 50 rows. Fairness metrics may be statistically insignificant.")
+    elif len(df) < 200:
+        warnings.append("Notice: Dataset is relatively small. Interpret fairness gaps with caution.")
+
+    # Missing values check
+    total_missing_pct = (df.isna().sum().sum() / (df.shape[0] * df.shape[1])) * 100
+    if total_missing_pct > 20:
+        warnings.append(f"⚠️ Data Quality Warning: High overall missing values ({total_missing_pct:.1f}%). This may bias the results.")
+
     if len(df) > 100_000:
-        warnings.append("Large dataset detected. Analysis may take longer.")
+        warnings.append("Optimization: Large dataset detected. Analysis may take longer but provides higher confidence.")
 
     session_id = store_session(df)
     col_infos = _analyze_columns(df)

@@ -91,6 +91,13 @@ class FairnessMetrics(BaseModel):
     warnings: List[str] = []
 
 
+class DecisionSummary(BaseModel):
+    problem: str
+    cause: str
+    recommendation: str
+    expected_impact: str
+
+
 class AnalysisResponse(BaseModel):
     session_id: str
     dataset_summary: Dict[str, Any]
@@ -101,7 +108,10 @@ class AnalysisResponse(BaseModel):
     policy_compliance: Dict[str, Any]
     recommendations: List[str]
     impact_simulation: Optional[Dict[str, Any]] = None
+    decision_summary: Optional[DecisionSummary] = None
     warnings: List[str] = []
+    timestamp: Optional[str] = None
+    version: str = "v1.0"
 
 
 class ExplainRequest(BaseModel):

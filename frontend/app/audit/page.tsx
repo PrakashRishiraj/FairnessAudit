@@ -94,8 +94,7 @@ function AuditPageInner() {
         mitigationResponse: undefined
       }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDemo, sampleDatasets.length]);
+  }, [isDemo, sampleDatasets]);
 
   function handleSampleSelect(sample: SampleDataset, demo = false) {
     setState((prev) => ({

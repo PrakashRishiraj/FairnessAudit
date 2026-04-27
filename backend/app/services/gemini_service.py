@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 # Configure Gemini
 if settings.GEMINI_API_KEY:
     genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
 else:
     logger.warning("GEMINI_API_KEY not found. AI insights will use rule-based fallback.")
     model = None
@@ -20,31 +20,37 @@ STEP_PROMPTS = {
         "The user is on the DATASET UPLOAD step. They are choosing or uploading a dataset. "
         "Help them understand their data structure, suggest which columns might be sensitive "
         "(e.g., gender, race, age), and explain what a good dataset for fairness auditing looks like."
+        "Give a crisp and conscise output not exceeding 100 words"
     ),
     "mapping": (
         "The user is on the COLUMN MAPPING step. They are selecting target, prediction, "
         "feature, and sensitive columns. Help them understand what each mapping means and "
         "why correct mapping is critical for accurate bias detection."
+        "Give a crisp and conscise output not exceeding 100 words"
     ),
     "analyze": (
         "The user is on the FAIRNESS ANALYSIS step. They can see metrics like demographic parity, "
         "equalized odds, and fairness scores. Help them interpret these metrics in plain English, "
         "explain what the numbers mean, and why certain groups may be disadvantaged."
+        "Give a crisp and conscise output not exceeding 100 words"
     ),
     "explain": (
         "The user is on the SHAP EXPLAINABILITY step. They can see feature importance values "
         "and proxy feature warnings. Help them understand which features drive bias, what SHAP "
         "values represent, and what proxy features mean for fairness."
+        "Give a crisp and conscise output not exceeding 100 words"
     ),
     "mitigate": (
         "The user is on the BIAS MITIGATION step. They can see before/after fairness scores "
         "from algorithms like Reweighing and Exponentiated Gradient. Help them understand "
         "the trade-offs, which method to choose, and what the accuracy impact means."
+        "Give a crisp and conscise output not exceeding 100 words"
     ),
     "report": (
         "The user is on the REPORT step. They can download compliance certificates and audit "
         "reports. Help them understand the report contents, compliance status, and next steps "
         "for deploying a fairer model."
+        "Give a crisp and conscise output not exceeding 100 words"
     ),
 }
 

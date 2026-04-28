@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import List
 import os
 
@@ -13,6 +14,14 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
     ]
+
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v):
+        if isinstance(v, str):
+            # Handle comma-separated string e.g. "*, https://example.com"
+            return [origin.strip() for origin in v.split(",")]
+        return v
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE_MB: int = 50
     SAMPLE_DATA_DIR: str = "app/data/samples"

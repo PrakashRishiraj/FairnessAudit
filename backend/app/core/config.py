@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
     # Comma-separated origins string, e.g. "*" or "https://a.com,https://b.com"
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001"
+    ALLOWED_ORIGINS: str = "*"
 
     @property
     def allowed_origins_list(self) -> List[str]:
